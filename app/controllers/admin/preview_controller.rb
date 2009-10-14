@@ -1,8 +1,7 @@
 class Admin::PreviewController < ApplicationController
   
   def create
-    @page = page_class.new
-    set_attributes
+    build_and_set_attributes
     if @page.valid? || (@page.errors.size == 1 && @page.errors.on(:slug) =~ /slug already in use/)
       begin
         Page.transaction do
@@ -27,20 +26,22 @@ class Admin::PreviewController < ApplicationController
   end
   
   private
-    def set_attributes
-      @page.slug = params[:slug]
+    def build_and_set_attributes
+      if params[:page][:parts_attributes].is_a? Hash
+        @page_parts = params[:page].delete(:parts_attributes).map {|i, v| v }
+      end
+      @page = page_class.new(params[:page])
       if params[:page_preview] && params[:page_preview][:parent_id]
         @page.parent = Page.find_by_id(params[:page_preview][:parent_id].to_i)
       end
-      @page.attributes = params[:page]
       set_times
       set_parts
     end
     
     def set_parts
-      parts_to_update = {}
-      (params[:part]||{}).each {|k,v| parts_to_update[v[:name]] = v }
-      parts_to_update.values.each do |attrs|
+      @page_parts.each do |attrs|
+        attrs.delete(:id)
+        attrs.delete(:_delete)
         @page.parts.build(attrs)
       end
     end
